@@ -1,9 +1,10 @@
 import { useState } from "react";
-import ReactMapGL, { Marker } from "react-map-gl";
+import { gql, useSubscription } from "@apollo/react-hooks";
+import ReactMapGL, { Popup } from "react-map-gl";
 import { InteractiveMapProps } from "react-map-gl/src/components/interactive-map";
-import cowIcon from "../../assets/images/cow.png";
+import { Markers } from "./components/Marker";
 
-interface Position {
+export interface Position {
   lat: number;
   lng: number;
 }
@@ -13,17 +14,14 @@ interface AnimalPosition {
   __typename: string;
 }
 
-interface Animal {
+export interface Animal {
   name: string;
   animal_positions: AnimalPosition[];
   __typename: string;
 }
 
-interface MapProps {
-  animals: Animal[];
-}
-
-export const Map = ({ animals }: MapProps) => {
+export const Map = () => {
+  const [popupInfo, setPopupInfo] = useState<Animal>();
   const [viewport, setViewport] = useState<InteractiveMapProps>({
     width: "100vw",
     height: "100vh",
@@ -32,6 +30,26 @@ export const Map = ({ animals }: MapProps) => {
     mapStyle: "mapbox://styles/mapbox/dark-v9",
     zoom: 4,
   });
+  const { data, error, loading } = useSubscription(
+    gql`
+      subscription getAnimalByName {
+        animal {
+          name
+          animal_positions(order_by: { created_at: desc }) {
+            position {
+              lng
+              lat
+            }
+          }
+        }
+      }
+    `
+  );
+  if (loading) {
+    return <div>Loading...</div>;
+  } else if (error) {
+    return <div>Error... {error.message}</div>;
+  }
 
   return (
     <ReactMapGL
@@ -39,24 +57,22 @@ export const Map = ({ animals }: MapProps) => {
       mapboxApiAccessToken={process.env.REACT_APP_MAPBOX_API_ACCESS_TOKEN}
       onViewportChange={(nextViewport: any) => setViewport(nextViewport)}
     >
-      {animals.map((animal) => {
-        console.log({ animal });
-        const { animal_positions } = animal;
-        if (!animal_positions.length) {
-          return null;
-        }
-        return (
-          <Marker
-            draggable
-            latitude={animal.animal_positions[0].position.lat}
-            longitude={animal.animal_positions[0].position.lng}
-            // offsetLeft={-20}
-            // offsetTop={-10}
+      <>
+        <Markers animals={data.animal} onClick={setPopupInfo} />
+        {popupInfo && (
+          <Popup
+            latitude={popupInfo.animal_positions[0].position.lat}
+            dynamicPosition={false}
+            longitude={popupInfo.animal_positions[0].position.lng}
+            closeButton={true}
+            closeOnClick={false}
+            onClose={setPopupInfo}
+            anchor='top'
           >
-            <img src={cowIcon} width={40} height={40} alt='pin-icon' />
-          </Marker>
-        );
-      })}
+            <div>{popupInfo.name}</div>
+          </Popup>
+        )}
+      </>
     </ReactMapGL>
   );
 };
