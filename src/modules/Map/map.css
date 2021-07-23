@@ -1,0 +1,10 @@
+.popup {
+  display: flex;
+  flex-direction: column;
+}
+
+.popupItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
